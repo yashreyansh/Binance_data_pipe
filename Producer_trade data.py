@@ -2,7 +2,7 @@ import websocket
 import json, time, threading
 from confluent_kafka import Producer
 
-
+running = True
 
 def run_ws(duration):
     ws = websocket.WebSocketApp(socket,
@@ -12,13 +12,15 @@ def run_ws(duration):
                                 on_close=on_close)
     
     def stop_ws():
+        global running
+        running = False
         ws.close()
     timer = threading.Timer(duration, stop_ws)
     timer.start()
     
     ws.run_forever()
 
-
+########################################################################
 def on_message(ws, message):
     #global trades_count
     trade = json.loads(message)
@@ -29,13 +31,17 @@ def on_message(ws, message):
     #return trade
         
 def on_error(ws, error):
+    if batch:
+        send_batch_to_kafka(batch)
+        print("sending rest of the data via error")
+    print("ERRRORRRRR..")
     print("Error:", error)
 
 def on_close(ws, close_status_code, close_msg):
     if batch:
         send_batch_to_kafka(batch)
         print("sending rest of the data")
-    print("Closed connection")
+    print("Closed connection ")
 
 def on_open(ws):
     print("Connection opened")
@@ -84,15 +90,16 @@ if __name__ == "__main__":
     
     # Binance WebSocket endpoint for BTC/USDT trades
     socket = "wss://stream.binance.com:9443/ws/btcusdt@trade"
-    
-    
-    batch = []
+
     
     
     i = 0
-    for i in range(3):
-        run_ws(3)      # duration of 5 seconds
-        time.sleep(5)
+    try:
+        for i in range(config["temp_trade_runs"]):
+            run_ws(3)      # duration of 5 seconds
+            time.sleep(5)
+    except KeyboardInterrupt:
+        print("Shutdown signal received, stopping loop")
 
 
     
